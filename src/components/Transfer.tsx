@@ -79,13 +79,14 @@ export default function Transfer({
       let finalUserOp = await smartAccount.buildTokenPaymasterUserOp(userOp, {
         feeQuote: selectedFeeQuote,
         spender: spender,
-        maxApproval: true,
+        maxApproval: false,
       });
 
       // Get the calldata for the paymaster
       const paymasterServiceData = {
         mode: PaymasterMode.ERC20,
         feeTokenAddress: USDC_CONTRACT_ADDRESS,
+        calculateGasLimits: true,
       };
       const paymasterAndDataResponse =
         await biconomyPaymaster.getPaymasterAndData(
@@ -93,6 +94,22 @@ export default function Transfer({
           paymasterServiceData
         );
       finalUserOp.paymasterAndData = paymasterAndDataResponse.paymasterAndData;
+
+      if (
+        paymasterAndDataResponse.callGasLimit &&
+        paymasterAndDataResponse.verificationGasLimit &&
+        paymasterAndDataResponse.preVerificationGas
+      ) {
+        // Returned gas limits must be replaced in your op as you update paymasterAndData.
+        // Because these are the limits paymaster service signed on to generate paymasterAndData
+        // If you receive AA34 error check here..
+
+        finalUserOp.callGasLimit = paymasterAndDataResponse.callGasLimit;
+        finalUserOp.verificationGasLimit =
+          paymasterAndDataResponse.verificationGasLimit;
+        finalUserOp.preVerificationGas =
+          paymasterAndDataResponse.preVerificationGas;
+      }
 
       // Send the UserOperation
       const userOpResponse = await smartAccount.sendUserOp(finalUserOp);
